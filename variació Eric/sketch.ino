@@ -14,9 +14,9 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 int contador = 0;
-bool estadoAnterior = HIGH;          // Con pull-up, reposo = HIGH
+bool estadoAnterior = HIGH;          // En HIGH por defecto gracias al PULLUP
 unsigned long ultimoRebote = 0;
-const unsigned long TIEMPO_REBOTE = 50; // ms (antirrebote)
+const unsigned long TIEMPO_REBOTE = 150; // Subido a 150ms para evitar dobles rebotes molestos
 
 void mostrarContador() {
   display.clearDisplay();
@@ -35,7 +35,9 @@ void mostrarContador() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(PIN_BOTON, INPUT);   // Pull-up externa de 10k
+  
+  // Usamos pull-up interna para evitar estados flotantes que causan falsos positivos
+  pinMode(PIN_BOTON, INPUT_PULLUP);   
 
   Wire.begin(21, 22);
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
@@ -48,14 +50,18 @@ void setup() {
 void loop() {
   bool estadoActual = digitalRead(PIN_BOTON);
 
-  // Detecta flanco de bajada (pulsación) con antirrebote
-  if (estadoAnterior == HIGH && estadoActual == LOW &&
-      (millis() - ultimoRebote) > TIEMPO_REBOTE) {
-    contador++;
-    ultimoRebote = millis();
-    Serial.print("Pulsaciones: ");
-    Serial.println(contador);
-    mostrarContador();
+  // Detecta flanco de bajada (cuando se presiona el botón hacia GND)
+  if (estadoAnterior == HIGH && estadoActual == LOW) {
+    // Comprobamos el tiempo transcurrido desde el último rebote válido
+    if ((millis() - ultimoRebote) > TIEMPO_REBOTE) {
+      contador++;
+      ultimoRebote = millis(); // Actualizamos el marcador de tiempo
+      Serial.print("Pulsaciones: ");
+      Serial.println(contador);
+      mostrarContador();
+    }
   }
+  
+  // Guardamos el estado actual para la siguiente iteración
   estadoAnterior = estadoActual;
 }
